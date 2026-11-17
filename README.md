@@ -8,6 +8,10 @@ decide whether it's worth building, write a spec, build it, gate it on your own
 checks, review it, and open a PR that closes the issue. The approver merges
 what it's sure of and hands you the rest.
 
+<p align="center">
+  <img src="docs/pipeline.svg" width="100%" alt="Factory pipeline: a factory-labeled GitHub issue goes through intake (Fable), route (script), spec-writer, builder, gate (checks.sh), routed reviewers, approver and job merge. Gate failures and review changes loop back to the builder as new rounds, up to max_rounds. Intake can park a job for the author or reject it; a blocked builder, an exhausted last round, an approver escalation or a failed pre-merge gate hands the PR to a human, whose /factory feedback starts new rounds.">
+</p>
+
 This package distributes the
 [ZazenCodes software factory v2](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2)
 (GPLv3). The skill, agents, scripts and dashboard in `templates/` are the
