@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync, statSync, existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { init, update } from '../src/commands.mjs';
+import { configuredSkills, doctor, init, installSkills, update } from '../src/commands.mjs';
 import { FILES, MANIFEST, frontmatterKeys, mergeMissing, sha256, template } from '../src/files.mjs';
 import { generateChecks, parseVersion, versionAtLeast } from '../src/detect.mjs';
 
@@ -170,15 +170,80 @@ test('factory/bin/dashboard serves the board on localhost, reuses it, and stops'
   assert.equal(run('--status').status, 1);
 });
 
-test('every patch in scripts/patches is already applied to templates/', () => {
+test('scripts/patches stack cleanly: undo all in reverse, then reapply in order', () => {
   const root = new URL('..', import.meta.url).pathname;
-  const dir = join(root, 'scripts/patches');
-  const patches = readdirSync(dir).filter((f) => f.endsWith('.patch'));
-  assert.ok(patches.length > 0);
-  for (const p of patches) {
-    const r = spawnSync('git', ['apply', '--check', '--reverse', join(dir, p)], { cwd: root, encoding: 'utf8' });
-    assert.equal(r.status, 0, `${p}: ${r.stderr}`);
+  const patchDir = join(root, 'scripts/patches');
+  const patches = readdirSync(patchDir).filter((f) => f.endsWith('.patch')).sort();
+  assert.ok(patches.length >= 3);
+  const tmp = realpathSync(mkdtempSync(join(tmpdir(), 'af-patches-')));
+  execFileSync('cp', ['-R', join(root, 'templates'), join(tmp, 'templates')]);
+  execFileSync('git', ['init', '-q'], { cwd: tmp });
+  const apply = (p, ...flags) => spawnSync('git', ['apply', ...flags, join(patchDir, p)], { cwd: tmp, encoding: 'utf8' });
+  for (const p of [...patches].reverse()) assert.equal(apply(p, '--reverse').status, 0, `undo ${p}`);
+  for (const p of patches) { const r = apply(p); assert.equal(r.status, 0, `apply ${p}: ${r.stderr}`); }
+});
+
+test('builder and code reviewer are told to apply the configured skills', () => {
+  for (const agent of ['builder', 'reviewer-code']) {
+    const text = template(`.claude/agents/${agent}.md`).toString();
+    assert.match(text, /`skills` in `factory\/config\.json`/, agent);
+    assert.match(text, /<main checkout>\/\.claude\/skills\/<name>\/SKILL\.md/, agent);
   }
+  const cfg = JSON.parse(template('factory/config.json'));
+  assert.ok(cfg.skills['vercel-react-best-practices'].install.includes('--skill vercel-react-best-practices'));
+});
+
+test('configuredSkills uses detect to decide which skills apply', () => {
+  const react = repo({ 'package.json': JSON.stringify({ dependencies: { react: '19.0.0' } }) });
+  init({ dir: react, detect: false, log: quiet });
+  const [s] = configuredSkills(react);
+  assert.equal(s.name, 'vercel-react-best-practices');
+  assert.equal(s.relevant, true);
+  assert.equal(s.installed, false);
+
+  const plain = repo();
+  init({ dir: plain, detect: false, log: quiet });
+  assert.equal(configuredSkills(plain)[0].relevant, false);
+});
+
+test('installSkills runs install commands for missing relevant skills; doctor sees them', () => {
+  const dir = repo({ 'package.json': JSON.stringify({ devDependencies: { next: '15.0.0' } }) });
+  init({ dir, detect: false, log: quiet });
+  const path = join(dir, 'factory/config.json');
+  const cfg = JSON.parse(readFileSync(path, 'utf8'));
+  cfg.skills['vercel-react-best-practices'].install =
+    'mkdir -p .claude/skills/vercel-react-best-practices && echo rules > .claude/skills/vercel-react-best-practices/SKILL.md';
+  cfg.skills['not-relevant'] = { applies_to: 'Vue', detect: ['vue'], install: 'exit 1' };
+  writeFileSync(path, JSON.stringify(cfg));
+
+  const lines = [];
+  const before = [];
+  doctor({ dir, log: (l) => before.push(l) });
+  assert.ok(before.some((l) => /✘ skill vercel-react-best-practices: not installed/.test(l)));
+  assert.ok(!before.some((l) => /skill not-relevant/.test(l)));
+
+  assert.equal(installSkills({ dir, log: (l) => lines.push(l) }), true);
+  assert.ok(existsSync(join(dir, '.claude/skills/vercel-react-best-practices/SKILL.md')));
+  assert.ok(lines.some((l) => /not-relevant: skipped/.test(l)));
+  assert.equal(installSkills({ dir, all: true, log: quiet }), false); // the irrelevant one's install fails
+
+  const after = [];
+  doctor({ dir, log: (l) => after.push(l) });
+  assert.ok(after.some((l) => /✔ skill vercel-react-best-practices/.test(l)));
+});
+
+test('update adds the skills section to an older config without touching other values', () => {
+  const dir = repo();
+  init({ dir, detect: false, log: quiet });
+  const path = join(dir, 'factory/config.json');
+  const cfg = JSON.parse(readFileSync(path, 'utf8'));
+  delete cfg.skills;
+  cfg.routing.low.code = 'haiku';
+  writeFileSync(path, JSON.stringify(cfg));
+  update({ dir, log: quiet });
+  const after = JSON.parse(readFileSync(path, 'utf8'));
+  assert.ok(after.skills['vercel-react-best-practices']);
+  assert.equal(after.routing.low.code, 'haiku');
 });
 
 test('the code reviewer runs on Opus at every risk level', () => {

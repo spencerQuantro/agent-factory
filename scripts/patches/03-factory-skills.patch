@@ -1,0 +1,62 @@
+diff --git a/templates/.claude/agents/builder.md b/templates/.claude/agents/builder.md
+index c511824..f7c5117 100644
+--- a/templates/.claude/agents/builder.md
++++ b/templates/.claude/agents/builder.md
+@@ -40,6 +40,13 @@ other jobs.
+    after the job escalated. Read `decision.md` and every round folder too, so
+    you know the history. The feedback comes before the reviews and the spec
+    where they disagree.
++6. The `skills` in `factory/config.json`. For each one whose `applies_to`
++   covers code you will write or change, read
++   `<main checkout>/.claude/skills/<name>/SKILL.md`, then the rule files it
++   points to that bear on your change (not a compiled `AGENTS.md` inside the
++   skill). Follow them like the repo's instructions; the repo's `AGENTS.md`
++   wins where they disagree. Skip a skill whose folder doesn't exist. Name the
++   skills you applied in build.md's Summary.
+ 
+ ## Build
+ 
+diff --git a/templates/.claude/agents/reviewer-code.md b/templates/.claude/agents/reviewer-code.md
+index 41a4f7a..491e5f4 100644
+--- a/templates/.claude/agents/reviewer-code.md
++++ b/templates/.claude/agents/reviewer-code.md
+@@ -28,6 +28,10 @@ is in the main checkout; your one file goes there.
+    Read the changed files in full where the diff isn't enough.
+ 4. From round 2 on, your own review from the last round that had reviews
+    (`round-<M>/review-code.md`). Check whether each finding was fixed.
++5. The `skills` in `factory/config.json`. For each one whose `applies_to`
++   covers code in the diff, read `<main checkout>/.claude/skills/<name>/SKILL.md`
++   and the rule files it points to that bear on the change (not a compiled
++   `AGENTS.md` inside the skill). Skip a skill whose folder doesn't exist.
+ 
+ ## Checks are done
+ 
+@@ -46,6 +50,10 @@ rewrites files, such as `--fix`.
+   duplicating them.
+ - **Conventions**: the repo's style as AGENTS.md and the neighbouring code show
+   it, and comment density like the neighbouring code.
++- **Skills**: the change follows the skills from step 5. Breaking a rule the
++  skill rates high impact (such as CRITICAL or HIGH) is a CHANGES finding that
++  cites the rule by name; lower-impact rules go under Notes. The repo's
++  AGENTS.md wins where a skill disagrees with it.
+ - **Docs**: AGENTS.md and any docs it lists are updated where the change
+   requires it.
+ - **Tests**: new behaviour has tests where the repo has a test runner, and no
+diff --git a/templates/factory/config.json b/templates/factory/config.json
+index ec0f66b..6d8f1b3 100644
+--- a/templates/factory/config.json
++++ b/templates/factory/config.json
+@@ -17,6 +17,13 @@
+     "ui": { "ux": "sonnet", "ui": "haiku" },
+     "security": { "security": "opus" }
+   },
++  "skills": {
++    "vercel-react-best-practices": {
++      "applies_to": "React and Next.js code: components, hooks, pages, routes, server actions and data fetching",
++      "detect": ["react", "next"],
++      "install": "npx -y skills add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
++    }
++  },
+   "protected_paths": [
+     "factory/checks.sh",
+     "factory/config.json"

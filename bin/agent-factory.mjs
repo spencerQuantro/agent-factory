@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
-import { createLabels, doctor, init, update } from '../src/commands.mjs';
+import { createLabels, doctor, init, installSkills, update } from '../src/commands.mjs';
 import { PKG } from '../src/files.mjs';
 
 const HELP = `agent-factory ${PKG.version}: a Claude Code software factory for GitHub issues
@@ -13,12 +13,15 @@ Commands:
   update    upgrade factory files you haven't edited to this package's version
   doctor    check the toolchain and the install (--full also runs checks.sh)
   labels    create the factory's GitHub labels (idempotent)
+  skills    install the Claude skills in config.json that apply to this project
 
 Options:
   -C, --dir <path>   project directory (default: current directory)
   -f, --force        init: overwrite existing files; update: replace edited files
   -n, --dry-run      show what would change without writing
       --labels       init: also create the GitHub labels
+      --skills       init: also install the skills that apply to this project
+      --all          skills: install every configured skill, ignoring "detect"
       --no-detect    init: don't ask git/gh for the base branch and merge method
       --full         doctor: also run factory/checks.sh and factory/bin/job queue
   -h, --help
@@ -34,6 +37,8 @@ function main() {
       force: { type: 'boolean', short: 'f' },
       'dry-run': { type: 'boolean', short: 'n' },
       labels: { type: 'boolean' },
+      skills: { type: 'boolean' },
+      all: { type: 'boolean' },
       'no-detect': { type: 'boolean' },
       full: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -49,7 +54,7 @@ function main() {
 
   switch (cmd) {
     case 'init': {
-      init({ ...opts, labels: values.labels, detect: !values['no-detect'] });
+      init({ ...opts, labels: values.labels, skills: values.skills, detect: !values['no-detect'] });
       if (!opts.dryRun) {
         console.log(`
 Next:
@@ -65,6 +70,9 @@ Next:
       break;
     case 'doctor':
       process.exitCode = doctor({ dir, full: values.full }) ? 0 : 1;
+      break;
+    case 'skills':
+      process.exitCode = installSkills({ dir, dryRun: opts.dryRun, all: values.all }) ? 0 : 1;
       break;
     case 'labels':
       process.exitCode = createLabels({ dir }) ? 0 : 1;
