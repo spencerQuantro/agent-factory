@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, statSync, existsSync, realpathSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync, statSync, existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { init, update } from '../src/commands.mjs';
@@ -170,9 +170,19 @@ test('factory/bin/dashboard serves the board on localhost, reuses it, and stops'
   assert.equal(run('--status').status, 1);
 });
 
-test('the dashboard patch is already applied to the shipped factory skill', () => {
-  const patch = new URL('../scripts/patches/factory-skill-dashboard.patch', import.meta.url).pathname;
+test('every patch in scripts/patches is already applied to templates/', () => {
   const root = new URL('..', import.meta.url).pathname;
-  const r = spawnSync('git', ['apply', '--check', '--reverse', patch], { cwd: root, encoding: 'utf8' });
-  assert.equal(r.status, 0, r.stderr);
+  const dir = join(root, 'scripts/patches');
+  const patches = readdirSync(dir).filter((f) => f.endsWith('.patch'));
+  assert.ok(patches.length > 0);
+  for (const p of patches) {
+    const r = spawnSync('git', ['apply', '--check', '--reverse', join(dir, p)], { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, `${p}: ${r.stderr}`);
+  }
+});
+
+test('the code reviewer runs on Opus at every risk level', () => {
+  const cfg = JSON.parse(template('factory/config.json'));
+  for (const risk of ['low', 'medium', 'high']) assert.equal(cfg.routing[risk].code, 'opus', risk);
+  assert.match(template('.claude/agents/reviewer-code.md').toString(), /^model: opus$/m);
 });

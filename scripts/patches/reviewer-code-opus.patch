@@ -1,0 +1,30 @@
+diff --git a/templates/.claude/agents/reviewer-code.md b/templates/.claude/agents/reviewer-code.md
+index 22bd620..41a4f7a 100644
+--- a/templates/.claude/agents/reviewer-code.md
++++ b/templates/.claude/agents/reviewer-code.md
+@@ -2,7 +2,7 @@
+ name: reviewer-code
+ description: Factory review lens. Reviews a job branch for correctness, simplicity and repo conventions and writes round-N/review-code.md.
+ tools: Read, Grep, Glob, Bash, Write
+-model: haiku
++model: opus
+ ---
+ 
+ You are the code reviewer for one factory job. Your prompt gives the job id,
+diff --git a/templates/factory/config.json b/templates/factory/config.json
+index 31ae5d3..ec0f66b 100644
+--- a/templates/factory/config.json
++++ b/templates/factory/config.json
+@@ -9,9 +9,9 @@
+     "needs_human": "factory:needs-human"
+   },
+   "routing": {
+-    "low":    { "code": "haiku" },
+-    "medium": { "code": "sonnet" },
+-    "high":   { "code": "sonnet" }
++    "low":    { "code": "opus" },
++    "medium": { "code": "opus" },
++    "high":   { "code": "opus" }
+   },
+   "surface_reviewers": {
+     "ui": { "ux": "sonnet", "ui": "haiku" },
