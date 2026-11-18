@@ -84,12 +84,23 @@ If the project has tools that scan the repo without reading `.gitignore`
 (some ESLint, Jest, Vitest, TypeScript or Tailwind configs), add `.worktrees/`
 to their ignore lists now.
 
-## 5. Labels
+## 5. Skills
+
+`factory/config.json` `skills` lists Claude skills the builder and the code
+reviewer apply to matching code (by default Vercel's
+`vercel-react-best-practices` for React and Next.js). Run
+`npx agent-factory skills`: it installs each one that applies to this project
+(by its `detect` packages) into `.claude/skills/`. Commit what it adds, along
+with `skills-lock.json` if one appears. Add an entry for any other skill the
+user wants the factory to follow: a name matching its `.claude/skills/<name>/`
+folder, `applies_to` in words, and optionally `detect` and `install`.
+
+## 6. Labels
 
 Run `npx agent-factory labels` (idempotent). It creates `factory`,
 `factory:needs-info` and `factory:needs-human` on GitHub.
 
-## 6. Verify
+## 7. Verify
 
 Run `npx agent-factory doctor --full`. It checks the toolchain, the files,
 agent frontmatter, `config.json`, `.gitignore`, the labels, runs
@@ -98,7 +109,7 @@ Fix anything it reports. If `checks.sh` fails on the current branch, the
 factory can never pass a job: fix the script (not the project) or tell the
 user what's broken.
 
-## 7. Hand over
+## 8. Hand over
 
 Stay on the branch the user is on. Commit the install with a one-line message
 and show the user the diff. Ask before pushing: the factory branches every job

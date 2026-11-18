@@ -15,8 +15,9 @@ what it's sure of and hands you the rest.
 This package distributes the
 [ZazenCodes software factory v2](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2)
 (GPLv3). The skill, agents, scripts and dashboard in `templates/` are the
-upstream files, unchanged apart from a `/factory dashboard` command
-([scripts/patches/](scripts/patches/)); the package adds an installer, an updater, a doctor,
+upstream files, unchanged apart from a few changes kept in
+[scripts/patches/](scripts/patches/): `/factory dashboard`, an Opus code
+reviewer, and the `skills` config; the package adds an installer, an updater, a doctor,
 and a `/factory-setup` skill for the per-project tailoring.
 
 ## Use it in a project
@@ -64,12 +65,39 @@ agent-factory init      copy the factory in, detect config, generate checks.sh
 agent-factory update    upgrade factory files you haven't edited to this version
 agent-factory doctor    check toolchain + install; --full also runs checks.sh and job queue
 agent-factory labels    create factory, factory:needs-info, factory:needs-human (idempotent)
+agent-factory skills    install the Claude skills in config.json that apply here (--all: every one)
 
   -C, --dir <path>   project directory      -n, --dry-run   show, don't write
   -f, --force        init: overwrite clashes; update: replace locally edited files
   --labels           init: also create labels
+  --skills           init: also install the skills that apply to this project
   --no-detect        init: skip git/gh detection
 ```
+
+### Claude skills the factory follows
+
+`factory/config.json` has a `skills` section. The builder reads every skill
+whose `applies_to` covers the code it's writing and follows it; the code
+reviewer checks the diff against the same skills and asks for changes when a
+high-impact rule is broken. Both read the skill from the main checkout's
+`.claude/skills/<name>/`, so a job branch can't change the rules it's judged by.
+
+The default config ships Vercel's React and Next.js rules:
+
+```json
+"skills": {
+  "vercel-react-best-practices": {
+    "applies_to": "React and Next.js code: components, hooks, pages, routes, server actions and data fetching",
+    "detect": ["react", "next"],
+    "install": "npx -y skills add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
+  }
+}
+```
+
+`agent-factory skills` runs `install` for each skill that isn't installed yet
+and whose `detect` packages are in `package.json` (`--all` ignores `detect`).
+`doctor` fails when one that applies is missing. To add another skill, install
+it into `.claude/skills/` and add an entry; `detect` and `install` are optional.
 
 ### How `update` stays safe
 

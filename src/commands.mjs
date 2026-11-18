@@ -29,9 +29,10 @@ function resolveDir(dir, log) {
 /**
  * Copy the factory into a project and do the mechanical half of INSTALL.md.
  * Options: dir, force (overwrite clashes), dryRun, labels (create GitHub labels),
+ * skills (install the configured Claude skills that apply to this project),
  * detect (query git/gh for base branch and merge method; default true), log.
  */
-export function init({ dir = process.cwd(), force = false, dryRun = false, labels = false, detect = true, log = console.log } = {}) {
+export function init({ dir = process.cwd(), force = false, dryRun = false, labels = false, skills = false, detect = true, log = console.log } = {}) {
   dir = resolveDir(dir, log);
   if (readManifest(dir) && !force) {
     throw new Error(`The factory is already installed here (${MANIFEST}). Use \`agent-factory update\`, or \`init --force\` to reinstall.`);
@@ -73,6 +74,12 @@ export function init({ dir = process.cwd(), force = false, dryRun = false, label
   if (added.length) log(`${dryRun ? 'would add' : 'added'} to .gitignore: ${added.join(' ')}`);
 
   if (labels && !dryRun) createLabels({ dir, log });
+
+  const wanted = configuredSkills(dir).filter((s) => s.relevant && !s.installed);
+  if (wanted.length && !dryRun) {
+    if (skills) installSkills({ dir, log });
+    else log(`skills: ${wanted.map((s) => s.name).join(', ')} apply to this project; run \`agent-factory skills\` to install`);
+  }
 
   return { dir, checksGenerated: Boolean(checks), config };
 }
@@ -150,6 +157,55 @@ export function update({ dir = process.cwd(), force = false, dryRun = false, log
   for (const p of result.kept) log(`kept    ${p} (edited locally; --force to replace)`);
   log(`${result.unchanged.length} file(s) already current. Now at ${PKG.name}@${PKG.version}.`);
   return result;
+}
+
+// ---- skills ----------------------------------------------------------------
+
+/** Claude skills the builder and code reviewer apply, from config.json `skills`. */
+export function configuredSkills(dir) {
+  const path = join(dir, 'factory/config.json');
+  if (!existsSync(path)) return [];
+  const skills = JSON.parse(readFileSync(path, 'utf8')).skills || {};
+  const deps = projectDependencies(dir);
+  return Object.entries(skills).map(([name, spec]) => ({
+    name,
+    ...spec,
+    // A skill with `detect` applies only when package.json depends on one of those packages.
+    relevant: !spec.detect?.length || spec.detect.some((d) => deps.has(d)),
+    installed: existsSync(join(dir, '.claude/skills', name, 'SKILL.md')),
+  }));
+}
+
+function projectDependencies(dir) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    return new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies }));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Install every relevant configured skill that isn't installed yet, by running
+ * its `install` command in the project root. `all` ignores `detect`.
+ */
+export function installSkills({ dir = process.cwd(), dryRun = false, all = false, log = console.log } = {}) {
+  dir = resolveDir(dir);
+  let ok = true;
+  const skills = configuredSkills(dir);
+  if (!skills.length) log('No skills in factory/config.json.');
+  for (const s of skills) {
+    if (s.installed) { log(`skill ${s.name}: installed`); continue; }
+    if (!s.relevant && !all) { log(`skill ${s.name}: skipped (package.json has none of ${s.detect.join(', ')}; --all installs it anyway)`); continue; }
+    if (!s.install) { log(`skill ${s.name}: missing, and config.json gives no install command`); ok = false; continue; }
+    if (dryRun) { log(`skill ${s.name}: would run ${s.install}`); continue; }
+    log(`skill ${s.name}: ${s.install}`);
+    const r = sh('sh', ['-c', s.install], dir, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const installed = existsSync(join(dir, '.claude/skills', s.name, 'SKILL.md'));
+    log(installed ? `skill ${s.name}: installed` : `skill ${s.name}: FAILED (exit ${r.status}) ${r.err.split('\n').slice(-3).join(' ')}`);
+    ok &&= installed;
+  }
+  return ok;
 }
 
 // ---- labels ----------------------------------------------------------------
@@ -244,6 +300,13 @@ export function doctor({ dir = process.cwd(), full = false, log = console.log } 
   const checksPath = join(dir, 'factory/checks.sh');
   if (existsSync(checksPath) && readFileSync(checksPath, 'utf8').includes('has no checks yet')) {
     fail('checks.sh', 'still the placeholder: run /factory-setup in Claude Code');
+  }
+
+  if (config) {
+    for (const s of configuredSkills(dir)) {
+      if (s.installed) pass(`skill ${s.name}`);
+      else if (s.relevant) fail(`skill ${s.name}`, 'not installed: run `agent-factory skills`');
+    }
   }
 
   const ignored = sh('git', ['check-ignore', 'factory/jobs/x', '.worktrees/x'], dir);
