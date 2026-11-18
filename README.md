@@ -15,7 +15,8 @@ what it's sure of and hands you the rest.
 This package distributes the
 [ZazenCodes software factory v2](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2)
 (GPLv3). The skill, agents, scripts and dashboard in `templates/` are the
-upstream files, unchanged; the package adds an installer, an updater, a doctor,
+upstream files, unchanged apart from a `/factory dashboard` command
+([scripts/patches/](scripts/patches/)); the package adds an installer, an updater, a doctor,
 and a `/factory-setup` skill for the per-project tailoring.
 
 ## Use it in a project
@@ -97,13 +98,15 @@ doctor({ dir: '/path/to/repo', full: true });
 factory/config.json                    concurrency, rounds, labels, routing, protected paths, prices
 factory/checks.sh                      your repo's checks; the gate runs it
 factory/bin/{job,gate,route}           the deterministic spine
-factory/dashboard.html                 cd factory && python3 -m http.server → :8000/dashboard.html
+factory/bin/dashboard                  serves the dashboard on localhost and opens it
+factory/dashboard.html                 the board: jobs, rounds, gate and review chips, cost
 factory/.agent-factory.json            install manifest for `update`
 ```
 
 ```
 /factory run          drain the queue: every open `factory` issue, `concurrency` at a time; also resumes
 /factory run <n>      one issue now
+/factory dashboard    open the live dashboard (factory/bin/dashboard --stop to stop it)
 /factory <anything>   ask about jobs, give feedback, reject, file a feature
 ```
 
@@ -124,7 +127,7 @@ How the pipeline works and why: [docs/upstream/DESIGN.md](docs/upstream/DESIGN.m
 ## Maintaining this package
 
 ```bash
-npm run sync-upstream [ref]   # pull the latest reference files into templates/
+npm run sync-upstream [ref]   # pull the latest reference files into templates/, re-apply scripts/patches/
 npm test
 npm version minor && npm publish
 ```

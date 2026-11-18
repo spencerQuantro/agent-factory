@@ -30,6 +30,13 @@ for f in "${FILES[@]}"; do
   cp "$SRC/$f" "$ROOT/templates/$f"
 done
 chmod +x "$ROOT/templates/factory/checks.sh" "$ROOT"/templates/factory/bin/*
+
+# Re-apply this package's changes to upstream files (e.g. /factory dashboard).
+for p in "$ROOT"/scripts/patches/*.patch; do
+  [ -e "$p" ] || continue
+  if git -C "$ROOT" apply "$p"; then echo "applied $(basename "$p")"
+  else echo "FAILED to apply $(basename "$p"): redo it by hand, then regenerate the patch" >&2; fi
+done
 cp "$SRC/INSTALL.md" "$SRC/DESIGN.md" "$ROOT/docs/upstream/"
 cp "$SRC/LICENSE" "$ROOT/LICENSE"
 

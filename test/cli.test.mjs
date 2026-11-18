@@ -147,3 +147,32 @@ test('CLI prints help and version', () => {
   assert.match(execFileSync('node', [bin, '--help'], { encoding: 'utf8' }), /Commands:/);
   assert.match(execFileSync('node', [bin, '-v'], { encoding: 'utf8' }), /^\d+\.\d+\.\d+/);
 });
+
+test('factory/bin/dashboard serves the board on localhost, reuses it, and stops', async () => {
+  const dir = repo();
+  init({ dir, detect: false, log: quiet });
+  const bin = join(dir, 'factory/bin/dashboard');
+  const port = String(18000 + Math.floor(Math.random() * 1000));
+  const run = (...args) => spawnSync(bin, args, { cwd: dir, encoding: 'utf8' });
+  try {
+    const first = run('--no-open', '--port', port);
+    assert.equal(first.status, 0, first.stderr);
+    const url = first.stdout.match(/http:\/\/127\.0\.0\.1:\d+\/dashboard\.html/)[0];
+    const res = await fetch(url);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /factory\/bin\/job/);
+    const again = run('--no-open');
+    assert.match(again.stdout, /already running/);
+    assert.equal(run('--status').stdout.trim(), url);
+  } finally {
+    assert.match(run('--stop').stdout, /stopped/);
+  }
+  assert.equal(run('--status').status, 1);
+});
+
+test('the dashboard patch is already applied to the shipped factory skill', () => {
+  const patch = new URL('../scripts/patches/factory-skill-dashboard.patch', import.meta.url).pathname;
+  const root = new URL('..', import.meta.url).pathname;
+  const r = spawnSync('git', ['apply', '--check', '--reverse', patch], { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+});

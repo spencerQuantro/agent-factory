@@ -1,6 +1,6 @@
 {
   "name": "@spencerquantro/agent-factory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Install a Claude Code software factory into any repo: GitHub issues → intake → spec → build → gate → review → PR.",
   "type": "module",
   "license": "GPL-3.0-only",

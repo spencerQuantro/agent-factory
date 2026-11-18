@@ -30,6 +30,7 @@ export const FILES = [
   { path: 'factory/bin/job', kind: 'managed', exec: true },
   { path: 'factory/bin/gate', kind: 'managed', exec: true },
   { path: 'factory/bin/route', kind: 'managed', exec: true },
+  { path: 'factory/bin/dashboard', kind: 'managed', exec: true },
   { path: 'factory/dashboard.html', kind: 'managed' },
   { path: 'factory/checks.sh', kind: 'owned', exec: true },
   { path: 'factory/config.json', kind: 'owned' },
