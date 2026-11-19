@@ -172,7 +172,7 @@ export function configuredSkills(dir) {
     ...spec,
     // A skill with `detect` applies only when package.json depends on one of those packages.
     relevant: !spec.detect?.length || spec.detect.some((d) => deps.has(d)),
-    installed: existsSync(join(dir, '.claude/skills', name, 'SKILL.md')),
+    installed: SKILL_NAME.test(name) && existsSync(join(dir, '.claude/skills', name, 'SKILL.md')),
   }));
 }
 
@@ -185,9 +185,27 @@ function projectDependencies(dir) {
   }
 }
 
+const SKILL_NAME = /^[A-Za-z0-9][\w.-]*$/;
+// Plain words only: no quotes, globs, pipes, redirects, substitutions or separators.
+const SAFE_ARG = /^[\w@%+=:,./-]+$/;
+
+/**
+ * Split a config.json `install` command into argv, or explain why it can't be
+ * run. Commands run without a shell, so anything that needs one is refused
+ * rather than handed to `sh -c`: a config.json from an untrusted clone or PR
+ * can't chain extra commands onto an install.
+ */
+export function parseInstall(command) {
+  if (typeof command !== 'string' || !command.trim()) return { error: 'empty install command' };
+  const argv = command.trim().split(/\s+/);
+  const bad = argv.find((a) => !SAFE_ARG.test(a));
+  if (bad) return { error: `refusing to run: ${JSON.stringify(bad)} needs a shell (only plain arguments are allowed)` };
+  return { argv };
+}
+
 /**
  * Install every relevant configured skill that isn't installed yet, by running
- * its `install` command in the project root. `all` ignores `detect`.
+ * its `install` command (without a shell) in the project root. `all` ignores `detect`.
  */
 export function installSkills({ dir = process.cwd(), dryRun = false, all = false, log = console.log } = {}) {
   dir = resolveDir(dir);
@@ -195,12 +213,15 @@ export function installSkills({ dir = process.cwd(), dryRun = false, all = false
   const skills = configuredSkills(dir);
   if (!skills.length) log('No skills in factory/config.json.');
   for (const s of skills) {
+    if (!SKILL_NAME.test(s.name)) { log(`skill ${JSON.stringify(s.name)}: invalid name, skipped`); ok = false; continue; }
     if (s.installed) { log(`skill ${s.name}: installed`); continue; }
     if (!s.relevant && !all) { log(`skill ${s.name}: skipped (package.json has none of ${s.detect.join(', ')}; --all installs it anyway)`); continue; }
     if (!s.install) { log(`skill ${s.name}: missing, and config.json gives no install command`); ok = false; continue; }
-    if (dryRun) { log(`skill ${s.name}: would run ${s.install}`); continue; }
-    log(`skill ${s.name}: ${s.install}`);
-    const r = sh('sh', ['-c', s.install], dir, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const { argv, error } = parseInstall(s.install);
+    if (error) { log(`skill ${s.name}: ${error}`); ok = false; continue; }
+    if (dryRun) { log(`skill ${s.name}: would run ${argv.join(' ')}`); continue; }
+    log(`skill ${s.name}: ${argv.join(' ')}`);
+    const r = sh(argv[0], argv.slice(1), dir, { stdio: ['ignore', 'pipe', 'pipe'] });
     const installed = existsSync(join(dir, '.claude/skills', s.name, 'SKILL.md'));
     log(installed ? `skill ${s.name}: installed` : `skill ${s.name}: FAILED (exit ${r.status}) ${r.err.split('\n').slice(-3).join(' ')}`);
     ok &&= installed;
