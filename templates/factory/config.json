@@ -21,7 +21,7 @@
     "vercel-react-best-practices": {
       "applies_to": "React and Next.js code: components, hooks, pages, routes, server actions and data fetching",
       "detect": ["react", "next"],
-      "install": "npx -y skills add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
+      "install": "npx -y skills@1.7.6 add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
     }
   },
   "protected_paths": [

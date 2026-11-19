@@ -89,7 +89,7 @@ The default config ships Vercel's React and Next.js rules:
   "vercel-react-best-practices": {
     "applies_to": "React and Next.js code: components, hooks, pages, routes, server actions and data fetching",
     "detect": ["react", "next"],
-    "install": "npx -y skills add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
+    "install": "npx -y skills@1.7.6 add vercel-labs/agent-skills --skill vercel-react-best-practices --agent claude-code -y"
   }
 }
 ```
@@ -98,6 +98,9 @@ The default config ships Vercel's React and Next.js rules:
 and whose `detect` packages are in `package.json` (`--all` ignores `detect`).
 `doctor` fails when one that applies is missing. To add another skill, install
 it into `.claude/skills/` and add an entry; `detect` and `install` are optional.
+`install` runs without a shell: it must be plain arguments (no `;`, `&&`, pipes,
+quotes, `$` or redirects), so a tampered `config.json` can't chain commands.
+Pin the installer's version (`skills@x.y.z`) rather than running the latest.
 
 ### How `update` stays safe
 
@@ -151,6 +154,12 @@ How the pipeline works and why: [docs/upstream/DESIGN.md](docs/upstream/DESIGN.m
   text reaches agents as quoted data, never as instructions. The factory
   pushes only `factory/*` branches, merges only via `gh pr merge`, and never
   deploys.
+- The dashboard binds to 127.0.0.1 and serves only `dashboard.html` and
+  `jobs/` (no dotfiles, config or scripts). It rejects requests whose `Host`
+  header isn't its own, so a web page can't read job data through DNS
+  rebinding.
+- Job IDs are validated before they touch the filesystem, so a crafted ID
+  can't reach outside `factory/jobs/`.
 
 ## Maintaining this package
 

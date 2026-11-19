@@ -98,7 +98,12 @@ def operator():
 # ---- Job files -------------------------------------------------------------
 
 
+JOB_ID = re.compile(r"\d{3,}-[a-z0-9-]+")
+
+
 def job_dir(job_id):
+    if not JOB_ID.fullmatch(str(job_id)):
+        die(f"bad job id {job_id!r}")
     return JOBS / job_id
 
 
